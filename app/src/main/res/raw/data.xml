@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed>
+
+    <song>
+        <title>All Along The Watchtower</title>
+        <author>The Jimi Hendrix Experience</author>
+        <file>all_along_the_watchtower</file>
+    </song>
+
+    <song>
+        <title>Bullets</title>
+        <author>Archive</author>
+        <file>bullets</file>
+    </song>
+
+    <song>
+        <title>By the Way</title>
+        <author>Red Hot Chili Peppers</author>
+        <file>by_the_way</file>
+    </song>
+
+    <song>
+        <title>Californication</title>
+        <author>Red Hot Chili Peppers</author>
+        <file>californication</file>
+    </song>
+
+    <song>
+        <title>Controlling Crowds</title>
+        <author>Archive</author>
+        <file>controlling_crowds</file>
+    </song>
+
+    <song>
+        <title>Fortunate Son</title>
+        <author>Creedence Clearwater Revival</author>
+        <file>fortunate_son</file>
+    </song>
+
+    <song>
+        <title>Hey Hey, My My</title>
+        <author>Battleme</author>
+        <file>hey_hey_my_my</file>
+    </song>
+
+    <song>
+        <title>The End</title>
+        <author>The Doors</author>
+        <file>the_end</file>
+    </song>
+
+    <song>
+        <title>The House Of The Rising Sun</title>
+        <author>The White Buffalo</author>
+        <file>the_house_of_the_rising_sun</file>
+    </song>
+
+    <song>
+        <title>The Rains Of Castamere</title>
+        <author>Sigur Ros</author>
+        <file>the_rains_of_castamere</file>
+    </song>
+
+    <song>
+        <title>Warship My Wreck</title>
+        <author>Marilyn Manson</author>
+        <file>warship_my_wreck</file>
+    </song>
+
+</feed>
+
