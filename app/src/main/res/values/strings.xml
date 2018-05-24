@@ -1,7 +1,18 @@
 <resources>
     <string name="app_name">MusicPlayer</string>
-
     <string name="about">About</string>
-
     <string name="settings">Settings</string>
+    <string name="user_saves">saved_settings</string>
+
+    <string name="icon_description">App icon</string>
+    <string name="app_description">MusicPlayer 21.37 pre-alpha</string>
+    <string name="slogan">The worst possible way to enjoy Your music</string>
+
+    <string name="shuffle">Random playing order</string>
+    <string name="next">Long click for track change</string>
+    <string name="rewind">Long click for rewind</string>
+    <string name="rewind_seek">Rewind unit</string>
+
+
+
 </resources>

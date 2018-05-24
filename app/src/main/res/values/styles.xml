@@ -7,14 +7,12 @@
         <item name="toolbarStyle">@style/ToolbarStyle</item>
         <item name="android:statusBarColor">@color/colorPrimary</item>
         <item name="android:textColor">@color/colorAccent</item>
-
     </style>
 
     <style name="ToolbarStyle" parent="Theme.AppCompat.NoActionBar">
         <item name="android:background">@color/colorPrimary</item>
-        <item name="titleTextAppearance">@style/TitleTextAppearance</item>
-        <item name="android:textColorSecondary">@color/colorAccent</item>
         <item name="titleMargin">12dp</item>
+        <item name="android:textColorSecondary">@color/colorAccent</item>
     </style>
 
     <style name="OverflowMenu" parent="Theme.AppCompat.Light.NoActionBar">
@@ -24,14 +22,14 @@
         <item name="android:dropDownVerticalOffset">4.0dp</item>
     </style>
 
-    <style name="TitleTextAppearance" parent="TextAppearance.Widget.AppCompat.Toolbar.Title">
-        <item name="android:textColor">@color/colorAccent</item>
-        <item name="android:textSize">22sp</item>
-    </style>
-
-    <style name="SubtitleTextAppearance" parent="TextAppearance.Widget.AppCompat.Toolbar.Subtitle">
+    <style name="TitleTextAppearance" parent="TextAppearance.AppCompat">
         <item name="android:textColor">@color/colorAccent</item>
         <item name="android:textSize">20sp</item>
+    </style>
+
+    <style name="CustomTextAppearance" parent="TextAppearance.AppCompat">
+        <item name="android:textColor">@color/colorAccent</item>
+        <item name="android:textSize">18sp</item>
     </style>
 
 </resources>
