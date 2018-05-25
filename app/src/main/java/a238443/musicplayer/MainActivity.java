@@ -1,6 +1,8 @@
 package a238443.musicplayer;
 
 import android.app.Activity;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -9,6 +11,7 @@ import android.graphics.Point;
 import android.graphics.Typeface;
 import android.media.MediaPlayer;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -34,6 +37,9 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Random;
 
+import static a238443.musicplayer.Constants.FUNCTIONAL.FORWARD_COOLDOWN;
+import static a238443.musicplayer.Constants.FUNCTIONAL.MUSIC_REFRESH_DELAY;
+
 public class MainActivity extends AppCompatActivity{
     RecyclerAdapter mainAdapter;
     RecyclerView recyclerView;
@@ -53,13 +59,12 @@ public class MainActivity extends AppCompatActivity{
     boolean shuffle = false;
     private SharedPreferences sharedPref;
     private int rewindAmount = 10000;
-    private static final int FORWARD_COOLDOWN = 1500;
-    private static final int REFRESH_DELAY = 500;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        createNotificationChannel();
 
         findAll();
         addListeners();
@@ -117,6 +122,10 @@ public class MainActivity extends AppCompatActivity{
         savedInstanceState.putBoolean("isInverted", doubleClickInverted);
         savedInstanceState.putBoolean("shuffle", shuffle);
         savedInstanceState.putInt("rewindAmount", rewindAmount);
+        if(playedPosition != -1) {
+            savedInstanceState.putInt("currentPosition", playedPosition);
+            savedInstanceState.putInt("currentDuration", currentDuration);
+        }
     }
 
     @Override
@@ -127,6 +136,8 @@ public class MainActivity extends AppCompatActivity{
         doubleClickInverted = savedInstanceState.getBoolean("isInverted");
         shuffle = savedInstanceState.getBoolean("shuffle");
         rewindAmount = savedInstanceState.getInt("rewindAmount");
+        playedPosition = savedInstanceState.getInt("currentPosition", -1);
+        currentDuration = savedInstanceState.getInt("currentDuration",0);
     }
 
     @Override
@@ -183,7 +194,7 @@ public class MainActivity extends AppCompatActivity{
             public void onButtonClicked(View itemView, int position) {
                 Song clicked = mainAdapter.getItem(position);
 
-                if(playedPosition <0) {
+                if(!player.isPlaying()) {
                     playerSetup(clicked, position);
                     showMediaControl();
                     menuChange(clicked);
@@ -192,7 +203,8 @@ public class MainActivity extends AppCompatActivity{
                     playOnListButton = itemView.findViewById(R.id.play_pause_list);
                     playOnListButton.setBackground(getDrawable(R.drawable.ic_pause));
 
-                    durationHandler.postDelayed(updateSeekBarTime,REFRESH_DELAY);
+                    durationHandler.postDelayed(updateSeekBarTime, MUSIC_REFRESH_DELAY);
+                    manageService();
                 }
                 else {
                     if(playedPosition == position)
@@ -318,7 +330,7 @@ public class MainActivity extends AppCompatActivity{
 
             menuChange(newTrack);
         }
-        durationHandler.postDelayed(updateSeekBarTime,REFRESH_DELAY);
+        durationHandler.postDelayed(updateSeekBarTime, MUSIC_REFRESH_DELAY);
     }
 
     private Runnable updateSeekBarTime = new Runnable() {
@@ -329,9 +341,9 @@ public class MainActivity extends AppCompatActivity{
                 seekMenu.setProgress(currentDuration);
 
             durationMenu.setText(getTimeString(currentDuration));
-            durationHandler.postDelayed(this, REFRESH_DELAY);
+            durationHandler.postDelayed(this, MUSIC_REFRESH_DELAY);
 
-            if(currentDuration >= fullTime - REFRESH_DELAY) {
+            if(currentDuration >= fullTime - MUSIC_REFRESH_DELAY) {
                 if(shuffle) useShuffle();
                 else {
                     if (playedPosition < mainAdapter.getItemCount() - 1) {
@@ -366,7 +378,7 @@ public class MainActivity extends AppCompatActivity{
                                 int currentPosition = seekMenu.getProgress();
                                 durationMenu.setText(getTimeString(currentPosition));
                             }
-                            seekBarHandler.postDelayed(this, REFRESH_DELAY);
+                            seekBarHandler.postDelayed(this, MUSIC_REFRESH_DELAY);
                         }
                     };
                     runnable.run();
@@ -473,12 +485,20 @@ public class MainActivity extends AppCompatActivity{
         sp_editor.apply();
         sp_editor.putBoolean("inverted", doubleClickInverted);
         sp_editor.apply();
+        if(playedPosition != -1) {
+            sp_editor.putInt("currentPosition", playedPosition);
+            sp_editor.apply();
+            sp_editor.putInt("currentDuration", currentDuration);
+            sp_editor.apply();
+        }
     }
 
     private void readUsersData() {
         rewindAmount = sharedPref.getInt("rewind",10000);
         shuffle = sharedPref.getBoolean("shuffle", false);
         doubleClickInverted = sharedPref.getBoolean("inverted", false);
+        playedPosition = sharedPref.getInt("currentPosition", -1);
+        currentDuration = sharedPref.getInt("currentDuration",0);
     }
 
     private void useShuffle() {
@@ -486,6 +506,38 @@ public class MainActivity extends AppCompatActivity{
         int range = mainAdapter.getItemCount();
         int shuffledPosition = (gen.nextInt(range-1)+1+playedPosition)%range;
         changeTrack(mainAdapter.getItem(shuffledPosition), shuffledPosition);
+    }
+
+    private void manageService() {
+        Intent service = new Intent(MainActivity.this, ForegroundService.class);
+        Log.d("aboutToStart","In manageService");
+        if (!ForegroundService.IS_SERVICE_RUNNING) {
+            service.setAction(Constants.ACTION.STARTFOREGROUND_ACTION);
+            Log.d("aboutToStart","In notRunning");
+            ForegroundService.IS_SERVICE_RUNNING = true;
+        } else {
+            service.setAction(Constants.ACTION.STOPFOREGROUND_ACTION);
+            ForegroundService.IS_SERVICE_RUNNING = false;
+        }
+        Log.d("aboutToStart","Almost");
+        startService(service);
+        Log.d("started","Theoretically");
+    }
+
+    private void createNotificationChannel() {
+        // Create the NotificationChannel, but only on API 26+ because
+        // the NotificationChannel class is new and not in the support library
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            int importance = NotificationManager.IMPORTANCE_DEFAULT;
+            CharSequence name = "mainChannel";
+            String id = "mainID";
+            NotificationChannel channel = new NotificationChannel(id, name, importance);
+            channel.setDescription("testChannel");
+            // Register the channel with the system; you can't change the importance
+            // or other notification behaviors after this
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
+        }
     }
 }
 

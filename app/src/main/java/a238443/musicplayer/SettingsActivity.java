@@ -22,7 +22,6 @@ public class SettingsActivity extends AppCompatActivity{
     boolean doubleClickInverted = false;
     boolean useShuffle = false;
     int rewindAmount = 10;
-    private static final int REFRESH_DELAY = 100;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,6 +60,7 @@ public class SettingsActivity extends AppCompatActivity{
         doubleClickInverted = savedInstanceState.getBoolean("isInverted");
         useShuffle = savedInstanceState.getBoolean("shuffle");
         rewindAmount = savedInstanceState.getInt("rewindAmount");
+        manageTextViews();
     }
 
     private void findAll() {
@@ -127,7 +127,7 @@ public class SettingsActivity extends AppCompatActivity{
                             int currentPosition = 1+rewindSeek.getProgress();
                             String temp = currentPosition + "";
                             currentSeek.setText(temp);
-                            seekBarHandler.postDelayed(this, REFRESH_DELAY);
+                            seekBarHandler.postDelayed(this, Constants.FUNCTIONAL.REWIND_SET_REFRESH_DELAY);
                         }
                     };
                     runnable.run();
