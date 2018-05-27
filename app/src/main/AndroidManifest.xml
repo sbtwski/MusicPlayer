@@ -22,7 +22,10 @@
 
         <activity android:name=".AboutActivity"> </activity>
 
-        <service android:name=".ForegroundService"> </service>
+        <service android:name=".MusicService"> </service>
+
+        <receiver android:name=".MyBroadcastReceiver"  android:exported="true"> </receiver>
+
     </application>
 
 </manifest>
