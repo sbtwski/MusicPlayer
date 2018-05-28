@@ -21,7 +21,7 @@ public class SettingsActivity extends AppCompatActivity{
     Handler seekBarHandler;
     boolean doubleClickInverted = false;
     boolean useShuffle = false;
-    int rewindAmount = 10;
+    int rewindAmount = Constants.FUNCTIONAL.REWIND_AMOUNT/1000;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -157,7 +157,7 @@ public class SettingsActivity extends AppCompatActivity{
 
     private void getData() {
         Intent fromMain = getIntent();
-        rewindAmount = fromMain.getIntExtra("rewind",10);
+        rewindAmount = fromMain.getIntExtra("rewind",Constants.FUNCTIONAL.REWIND_AMOUNT/1000);
         doubleClickInverted = fromMain.getBooleanExtra("inverted", false);
         useShuffle = fromMain.getBooleanExtra("shuffle", false);
     }

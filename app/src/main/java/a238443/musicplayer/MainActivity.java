@@ -8,17 +8,16 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Point;
 import android.graphics.Typeface;
-import android.os.Build;
 import android.os.Handler;
-import android.support.annotation.RequiresApi;
+import android.support.constraint.ConstraintLayout;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
@@ -29,9 +28,7 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -47,7 +44,6 @@ public class MainActivity extends AppCompatActivity{
     RecyclerView recyclerView;
     ClickHandler handler;
     Button playOnListButton, playMenu, forwardMenu, rewindMenu;
-    RelativeLayout forRecycler;
     View mediaControl;
     TextView durationMenu, titleMenu, fullTimeMenu, titleToBold;
     SeekBar seekMenu;
@@ -63,16 +59,15 @@ public class MainActivity extends AppCompatActivity{
     boolean doubleClickInverted = false;
     boolean shuffle = false;
     private SharedPreferences sharedPref;
-    private int rewindAmount = 10000;
+    private int rewindAmount = Constants.FUNCTIONAL.REWIND_AMOUNT;
+    private boolean callStart = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-            createNotificationChannel();
-
+        createNotificationChannel();
         findAll();
         addListeners();
 
@@ -82,11 +77,12 @@ public class MainActivity extends AppCompatActivity{
 
         layoutManager = new PreCachingLayoutManager(getApplicationContext());
         layoutManager.setOrientation(LinearLayoutManager.VERTICAL);
-        layoutManager.setExtraLayoutSpace(getScreenHeight(getApplicationContext()));
+        layoutManager.setExtraLayoutSpace(getScreenHeight());
 
         sharedPref = getSharedPreferences(getString(R.string.user_saves), Activity.MODE_PRIVATE);
         recyclerView.setLayoutManager(layoutManager);
-        recyclerView.setItemAnimator(new DefaultItemAnimator());
+        recyclerView.setHasFixedSize(true);
+        recyclerView.setDrawingCacheEnabled(true);
 
         Toolbar mainToolbar = findViewById(R.id.main_toolbar);
         setSupportActionBar(mainToolbar);
@@ -108,17 +104,18 @@ public class MainActivity extends AppCompatActivity{
 
         manager = LocalBroadcastManager.getInstance(this);
         manager.registerReceiver(localBroadcastReceiver, localBroadcastFilter);
-    }
 
-    //TODO pauza nie zmienia się na play na ekranie blokady
+        if(playedPosition != -1) {
+            quickSetupAfterRestoration(savedInstanceState);
+        }
+    }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
 
         if(isFinishing()) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                deleteChannel();
+            deleteChannel();
             Intent service = new Intent(this, MusicService.class);
             stopService(service);
             manager.unregisterReceiver(localBroadcastReceiver);
@@ -134,17 +131,8 @@ public class MainActivity extends AppCompatActivity{
     @Override
     protected void onResume() {
         super.onResume();
-
-        if(playedPosition != -1) {
-            showMediaControl();
-            menuChange(mainAdapter.getItem(playedPosition), currentDuration);
-            updateUI.run();
-        }
-
         updateSeekBarTime.run();
     }
-
-    //TODO nie pogrubia po obrocie
 
     @Override
     public void onSaveInstanceState(Bundle savedInstanceState) {
@@ -153,6 +141,7 @@ public class MainActivity extends AppCompatActivity{
         savedInstanceState.putBoolean("isInverted", doubleClickInverted);
         savedInstanceState.putBoolean("shuffle", shuffle);
         savedInstanceState.putInt("rewindAmount", rewindAmount);
+        savedInstanceState.putBoolean("callStart", callStart);
         if(playedPosition != -1) {
             savedInstanceState.putInt("currentPosition", playedPosition);
             savedInstanceState.putInt("currentDuration", currentDuration);
@@ -202,10 +191,37 @@ public class MainActivity extends AppCompatActivity{
             if(resultCode == Activity.RESULT_OK) {
                 shuffle = data.getBooleanExtra("shuffle",false);
                 doubleClickInverted = data.getBooleanExtra("inverted", false);
-                rewindAmount = data.getIntExtra("rewind", 10000);
+                rewindAmount = data.getIntExtra("rewind", Constants.FUNCTIONAL.REWIND_AMOUNT);
                 updateServiceSettings();
             }
         }
+    }
+
+    private void quickSetupAfterRestoration(Bundle savedInstanceState) {
+        showMediaControl();
+        menuChange(mainAdapter.getItem(playedPosition), currentDuration);
+        simplifiedIndicate(playedPosition);
+        if(savedInstanceState != null)
+            callStart = savedInstanceState.getBoolean("callStart", true);
+        if(callStart) {
+            Runnable playChange = new Runnable() {
+                int counter = Constants.FUNCTIONAL.CHANGE_ATTEMPTS;
+                @Override
+                public void run() {
+                    if(counter > 0) {
+                        playMenu.setBackground(getDrawable(R.drawable.ic_play));
+                        counter--;
+                        updateUIHandler.postDelayed(this, Constants.FUNCTIONAL.UI_UPDATE_REFRESH_DELAY);
+                    }
+                    else
+                        updateUIHandler.removeCallbacks(this);
+                }
+            };
+            playChange.run();
+            callStart = false;
+        }
+        else
+            invertPlayIcon(playedPosition,true);
     }
 
     private void findAll() {
@@ -213,7 +229,6 @@ public class MainActivity extends AppCompatActivity{
         playOnListButton = findViewById(R.id.play_pause_list);
         titleToBold = findViewById(R.id.list_title);
         mediaControl = findViewById(R.id.media_control);
-        forRecycler = findViewById(R.id.for_recycler);
         durationMenu = findViewById(R.id.current_duration);
         playMenu = findViewById(R.id.play_pause_menu);
         forwardMenu = findViewById(R.id.forward_button);
@@ -221,6 +236,26 @@ public class MainActivity extends AppCompatActivity{
         seekMenu = findViewById(R.id.seek_menu);
         titleMenu = findViewById(R.id.title_menu);
         fullTimeMenu = findViewById(R.id.full_time);
+    }
+
+    private void parsingData() {
+        CustomXmlParser songParser = new CustomXmlParser(getApplicationContext());
+        try {
+            mainAdapter.addDatabase(songParser.parse(getResources().openRawResource(R.raw.data)));
+        } catch (FileNotFoundException e) {
+            Log.e("xml_opening", "File not found while trying to parse XML");
+        } catch (org.xmlpull.v1.XmlPullParserException e) {
+            Log.e("parsing", "XML parser problem");
+        } catch (IOException e) {
+            Log.e("io", "IO problem while trying to parse XML");
+        }
+    }
+
+    public int getScreenHeight() {
+        Display display = getWindowManager().getDefaultDisplay();
+        Point size = new Point();
+        display.getSize(size);
+        return size.y;
     }
 
     private void addListeners() {
@@ -308,26 +343,14 @@ public class MainActivity extends AppCompatActivity{
         ContextCompat.startForegroundService(getApplicationContext(),service);
     }
 
-    private void parsingData() {
-        CustomXmlParser songParser = new CustomXmlParser(getApplicationContext());
-        try {
-            mainAdapter.addDatabase(songParser.parse(getResources().openRawResource(R.raw.data)));
-        } catch (FileNotFoundException e) {
-            Log.e("xml_opening", "File not found while trying to parse XML");
-        } catch (org.xmlpull.v1.XmlPullParserException e) {
-            Log.e("parsing", "XML parser problem");
-        } catch (IOException e) {
-            Log.e("io", "IO problem while trying to parse XML");
-        }
-    }
-
     private void showMediaControl() {
-        RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams)recyclerView.getLayoutParams();
-        params.setMargins(0,0,0,dpToPx((int)getResources().getDimension(R.dimen.media_menu_size)));
+        ConstraintLayout.LayoutParams params = (ConstraintLayout.LayoutParams)recyclerView.getLayoutParams();
+        if(this.getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT)
+            params.setMargins(0,0,0,dpToPx((int)getResources().getDimension(R.dimen.media_menu_portrait_size)));
+        else
+            params.setMargins(0,0,dpToPx((int)getResources().getDimension(R.dimen.media_menu_landscape_size)),0);
         recyclerView.setLayoutParams(params);
         mediaControl.setVisibility(View.VISIBLE);
-        if(playedPosition != -1)
-            playMenu.setBackground(getDrawable(R.drawable.ic_play));
     }
 
     private int dpToPx(int dp){
@@ -337,15 +360,25 @@ public class MainActivity extends AppCompatActivity{
     }
 
     private void invertPlayIcon(int position, boolean playOn) {
-        loadIconView(position);
+        iconUpdate(position,playOn);
+    }
 
-        if (!playOn) {
-            playOnListButton.setBackground(getDrawable(R.drawable.ic_play));
-            playMenu.setBackground(getDrawable(R.drawable.ic_play));
-        } else {
-            playOnListButton.setBackground(getDrawable(R.drawable.ic_pause));
-            playMenu.setBackground(getDrawable(R.drawable.ic_pause));
+    private boolean loadTitleView(int position) {
+        SongHolder newTrackView = (SongHolder)recyclerView.findViewHolderForAdapterPosition(position);
+        if(newTrackView != null) {
+            titleToBold = newTrackView.titleText;
+            return true;
         }
+        return false;
+    }
+
+    private boolean loadIconView(int position) {
+        SongHolder newTrackView = (SongHolder)recyclerView.findViewHolderForAdapterPosition(position);
+        if(newTrackView != null) {
+            playOnListButton = newTrackView.playButton;
+            return true;
+        }
+        return false;
     }
 
     private void changeTrack(int newPosition, boolean fromService) {
@@ -363,110 +396,11 @@ public class MainActivity extends AppCompatActivity{
         durationHandler.postDelayed(updateSeekBarTime, MUSIC_REFRESH_DELAY);
     }
 
-    private boolean loadTitleView(int position) {
-        SongHolder newTrackView = (SongHolder)recyclerView.findViewHolderForAdapterPosition(position);
-        if(newTrackView != null) {
-            titleToBold = newTrackView.titleText;
-            return true;
-        }
-        return false;
-    }
-
-    private void loadIconView(int position) {
-        SongHolder newTrackView = (SongHolder)recyclerView.findViewHolderForAdapterPosition(position);
-        if(newTrackView != null)
-            playOnListButton = newTrackView.playButton;
-    }
-
     private void updateServiceTrack(int newPosition) {
         Intent service = new Intent(MainActivity.this, MusicService.class);
         service.setAction(Constants.ACTION.CHOICE);
         service.putExtra(Constants.EXTRAS.CLICKED_POSITION, newPosition);
         ContextCompat.startForegroundService(getApplicationContext(),service);
-    }
-
-    private Runnable updateUI = new Runnable() {
-        @Override
-        public void run() {
-            if(loadTitleView(playedPosition)) {
-                simplifiedIndicate(playedPosition);
-                invertPlayIcon(playedPosition, true);
-            }
-            else {
-                updateUIHandler.postDelayed(this,MUSIC_REFRESH_DELAY);
-            }
-        }
-    };
-
-    private Runnable updateSeekBarTime = new Runnable() {
-        public void run() {
-            if(notMoved)
-                seekMenu.setProgress(currentDuration);
-
-            durationMenu.setText(getTimeString(currentDuration));
-            durationHandler.postDelayed(this, MUSIC_REFRESH_DELAY);
-        }
-    };
-
-    private void manageSeekBar() {
-        seekMenu.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            int seekedProgess;
-
-            @Override
-            public void onProgressChanged(final SeekBar seekBar, int progress, boolean fromUser) {
-                seekedProgess = progress;
-
-                if (fromUser) {
-                    notMoved = false;
-                    Runnable runnable = new Runnable() {
-
-                        @Override
-                        public void run() {
-                            if (MusicService.IS_SERVICE_RUNNING) {
-                                int currentPosition = seekMenu.getProgress();
-                                durationMenu.setText(getTimeString(currentPosition));
-                            }
-                            seekBarHandler.postDelayed(this, MUSIC_REFRESH_DELAY);
-                        }
-                    };
-                    runnable.run();
-                }
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                moveDuration(seekedProgess);
-                currentDuration = seekedProgess;
-                notMoved = true;
-            }
-        });
-    }
-
-    private void setSeekMenuProgress(final int progress) {
-        seekMenu.post(new Runnable() {
-            @Override
-            public void run() {
-                seekMenu.setProgress(progress);
-            }
-        });
-    }
-
-    private void moveDuration(int progress) {
-        Intent service = new Intent(MainActivity.this, MusicService.class);
-        service.setAction(Constants.ACTION.MOVE_DURATION);
-        service.putExtra(Constants.EXTRAS.PROGRESS, progress);
-        ContextCompat.startForegroundService(getApplicationContext(),service);
-    }
-
-    private String getTimeString(int duration) {
-        int min = duration/60000;
-        int sec = (duration/1000)%60;
-        return String.format(Locale.ENGLISH,"%d%s%02d", min,":", sec);
     }
 
     private void menuChange(Song newTrack, int progress) {
@@ -482,28 +416,125 @@ public class MainActivity extends AppCompatActivity{
         currentDuration = progress;
     }
 
-    //TODO pierwszy puszczony utwór nie ma pełnego czasu
+    private String getTimeString(int duration) {
+        int min = duration/60000;
+        int sec = (duration/1000)%60;
+        return String.format(Locale.ENGLISH,"%d%s%02d", min,":", sec);
+    }
 
-    public static int getScreenHeight(Context context) {
-        WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
-        Display display = windowManager.getDefaultDisplay();
-        Point size = new Point();
-        display.getSize(size);
-        return size.y;
+    private Runnable updateSeekBarTime = new Runnable() {
+        public void run() {
+            if(notMoved)
+                seekMenu.setProgress(currentDuration);
+
+            durationMenu.setText(getTimeString(currentDuration));
+            durationHandler.postDelayed(this, MUSIC_REFRESH_DELAY);
+        }
+    };
+
+    private void manageSeekBar() {
+        seekMenu.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            int setProgress;
+
+            @Override
+            public void onProgressChanged(final SeekBar seekBar, int progress, boolean fromUser) {
+                setProgress = progress;
+
+                if (fromUser) {
+                    notMoved = false;
+                    Runnable runnable = new Runnable() {
+
+                        @Override
+                        public void run() {
+                            if (MusicService.IS_SERVICE_RUNNING) {
+                                int currentPosition = seekMenu.getProgress();
+                                durationMenu.setText(getTimeString(currentPosition));
+                            }
+                            seekBarHandler.postDelayed(this, Constants.FUNCTIONAL.REWIND_MENU_REFRESH_DELAY);
+                        }
+                    };
+                    runnable.run();
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                moveDuration(setProgress);
+                currentDuration = setProgress;
+                notMoved = true;
+            }
+        });
+    }
+
+    private void moveDuration(int progress) {
+        Intent service = new Intent(MainActivity.this, MusicService.class);
+        service.setAction(Constants.ACTION.MOVE_DURATION);
+        service.putExtra(Constants.EXTRAS.PROGRESS, progress);
+        ContextCompat.startForegroundService(getApplicationContext(),service);
+    }
+
+    private void setSeekMenuProgress(final int progress) {
+        seekMenu.post(new Runnable() {
+            @Override
+            public void run() {
+                seekMenu.setProgress(progress);
+            }
+        });
+    }
+
+    private void iconUpdate(final int position, final boolean playState) {
+        final Runnable iconUpdater = new Runnable() {
+            int positionToUpdate = position;
+            boolean playOn = playState;
+            @Override
+            public void run() {
+                if(loadIconView(positionToUpdate)){
+                    if (!playOn) {
+                        playOnListButton.setBackground(getDrawable(R.drawable.ic_play));
+                        playMenu.setBackground(getDrawable(R.drawable.ic_play));
+                    } else {
+                        playOnListButton.setBackground(getDrawable(R.drawable.ic_pause));
+                        playMenu.setBackground(getDrawable(R.drawable.ic_pause));
+                    }
+                    updateUIHandler.removeCallbacks(this);
+                }
+                else
+                    updateUIHandler.postDelayed(this,MUSIC_REFRESH_DELAY);
+            }
+        };
+        iconUpdater.run();
     }
 
     private void indicatePlayed(int newPosition) {
-        if(playedPosition != -1) {
-            loadTitleView(playedPosition);
-            titleToBold.setTypeface(Typeface.DEFAULT);
-        }
-        loadTitleView(newPosition);
-        titleToBold.setTypeface(Typeface.DEFAULT_BOLD);
+        if(playedPosition != -1)
+            typefaceUpdate(playedPosition,Typeface.DEFAULT);
+        typefaceUpdate(newPosition, Typeface.DEFAULT_BOLD);
     }
 
     private void simplifiedIndicate(int newPosition) {
-        loadTitleView(newPosition);
-        titleToBold.setTypeface(Typeface.DEFAULT_BOLD);
+        typefaceUpdate(newPosition,Typeface.DEFAULT_BOLD);
+    }
+
+    private void typefaceUpdate(final int position, final Typeface typeface) {
+        Runnable typefaceUpdater = new Runnable() {
+            int positionToUpdate = position;
+            Typeface typefaceToUpdate = typeface;
+            @Override
+            public void run() {
+                if(loadTitleView(positionToUpdate)) {
+                    titleToBold.setTypeface(typefaceToUpdate);
+                    updateUIHandler.removeCallbacks(this);
+                }
+                else
+                    updateUIHandler.postDelayed(this,MUSIC_REFRESH_DELAY);
+            }
+        };
+        typefaceUpdater.run();
     }
 
     private void saveUsersData() {
@@ -525,7 +556,7 @@ public class MainActivity extends AppCompatActivity{
     }
 
     private void readUsersData() {
-        rewindAmount = sharedPref.getInt("rewind",10000);
+        rewindAmount = sharedPref.getInt("rewind",Constants.FUNCTIONAL.REWIND_AMOUNT);
         shuffle = sharedPref.getBoolean("shuffle", false);
         doubleClickInverted = sharedPref.getBoolean("inverted", false);
         playedPosition = sharedPref.getInt("currentPosition", -1);
@@ -537,19 +568,19 @@ public class MainActivity extends AppCompatActivity{
         Intent service = new Intent(MainActivity.this, MusicService.class);
         if (!MusicService.IS_SERVICE_RUNNING) {
             service.setAction(Constants.ACTION.START_SERVICE);
-            service.putExtra(Constants.EXTRAS.PLAYED_POSITION, playedPosition);
+            if(playedPosition != -1) {
+                service.putExtra(Constants.EXTRAS.PLAYED_POSITION, playedPosition);
+                service.putExtra(Constants.EXTRAS.CURRENT_DURATION, currentDuration);
+            }
             service.putExtra(Constants.EXTRAS.REWIND_AMOUNT, rewindAmount);
             service.putExtra(Constants.EXTRAS.SHUFFLE_USE, shuffle);
             service.putExtra(Constants.EXTRAS.DATABASE, mainAdapter.getDatabase());
             MusicService.IS_SERVICE_RUNNING = true;
-        } else {
-            service.setAction(Constants.ACTION.STOP_SERVICE);
-            MusicService.IS_SERVICE_RUNNING = false;
         }
+
         ContextCompat.startForegroundService(getApplicationContext(),service);
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     private void createNotificationChannel() {
         int importance = NotificationManager.IMPORTANCE_LOW;
         CharSequence name = "Music Service";
@@ -557,14 +588,15 @@ public class MainActivity extends AppCompatActivity{
         NotificationChannel channel = new NotificationChannel(id, name, importance);
         channel.setDescription("Music playback service");
         NotificationManager notificationManager = getSystemService(NotificationManager.class);
-        notificationManager.createNotificationChannel(channel);
+        if(notificationManager != null)
+            notificationManager.createNotificationChannel(channel);
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     private void deleteChannel() {
-        NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         String id = "music_player";
-        mNotificationManager.deleteNotificationChannel(id);
+        if(notificationManager != null)
+            notificationManager.deleteNotificationChannel(id);
     }
 
     private void updateServiceSettings() {
@@ -581,19 +613,20 @@ public class MainActivity extends AppCompatActivity{
             String action = intent.getAction();
 
             if(action != null) {
-                if (action.equals(Constants.BROADCASTS.BASIC)) {
-                    currentDuration = intent.getIntExtra(Constants.EXTRAS.CURRENT_DURATION, 0);
-                }
-                else if (action.equals(Constants.BROADCASTS.PLAY_PAUSE)) {
-                    invertPlayIcon(playedPosition, intent.getBooleanExtra(Constants.EXTRAS.IS_PLAYING,false));
-                }
-                else if (action.equals(Constants.BROADCASTS.TRACK_CHANGE)) {
-                    fullTime = intent.getIntExtra(Constants.EXTRAS.FULL_TIME, 0);
-                    changeTrack(intent.getIntExtra(Constants.EXTRAS.PLAYED_POSITION, 0), true);
-                }
-                else if(action.equals(Constants.BROADCASTS.FULLTIME)) {
-                    fullTime = intent.getIntExtra(Constants.EXTRAS.FULL_TIME, 0);
-                    seekMenu.setMax(fullTime);
+                switch (action) {
+                    case Constants.BROADCASTS.BASIC:
+                        currentDuration = intent.getIntExtra(Constants.EXTRAS.CURRENT_DURATION, 0);
+                        break;
+                    case Constants.BROADCASTS.PLAY_PAUSE:
+                        invertPlayIcon(playedPosition, intent.getBooleanExtra(Constants.EXTRAS.IS_PLAYING,false));
+                        break;
+                    case Constants.BROADCASTS.TRACK_CHANGE:
+                        fullTime = intent.getIntExtra(Constants.EXTRAS.FULL_TIME, 0);
+                        changeTrack(intent.getIntExtra(Constants.EXTRAS.PLAYED_POSITION, 0), true);
+                        break;
+                    case Constants.BROADCASTS.FULLTIME:
+                        fullTime = intent.getIntExtra(Constants.EXTRAS.FULL_TIME, 0);
+                        seekMenu.setMax(fullTime);
                 }
             }
         }

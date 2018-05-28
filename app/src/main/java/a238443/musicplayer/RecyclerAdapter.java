@@ -3,6 +3,7 @@ package a238443.musicplayer;
 import android.content.Context;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
+import android.support.annotation.NonNull;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -23,7 +24,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<SongHolder> {
     }
 
     @Override
-    public void onBindViewHolder(SongHolder songHolder, int i) {
+    public void onBindViewHolder(@NonNull SongHolder songHolder, int i) {
         TextView title = songHolder.titleText;
         TextView author = songHolder.authorText;
         TextView length = songHolder.lengthText;
@@ -39,7 +40,8 @@ public class RecyclerAdapter extends RecyclerView.Adapter<SongHolder> {
     }
 
     @Override
-    public SongHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+    @NonNull
+    public SongHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         LayoutInflater inflater = LayoutInflater.from(parent.getContext());
         View view = inflater.inflate(R.layout.list_item, parent, false);
         return new SongHolder(view);

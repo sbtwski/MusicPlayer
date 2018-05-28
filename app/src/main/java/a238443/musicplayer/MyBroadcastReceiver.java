@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.support.v4.content.ContextCompat;
-import android.util.Log;
 
 public class MyBroadcastReceiver extends BroadcastReceiver{
     @Override
@@ -12,14 +11,15 @@ public class MyBroadcastReceiver extends BroadcastReceiver{
         String action = intent.getAction();
 
         if(action != null) {
-            if (action.equals(Constants.ACTION.PLAY_PAUSE))
-                universalBroadcast(context,Constants.ACTION.PLAY_PAUSE);
-            else if (action.equals(Constants.ACTION.NEXT)) {
-                universalBroadcast(context,Constants.ACTION.NEXT);
-            }
-            else if (action.equals(Constants.ACTION.PREV)) {
-                Log.d("PREV", "INPREV");
-                universalBroadcast(context,Constants.ACTION.PREV);
+            switch (action) {
+                case Constants.ACTION.PLAY_PAUSE:
+                    universalBroadcast(context,Constants.ACTION.PLAY_PAUSE);
+                    break;
+                case Constants.ACTION.NEXT:
+                    universalBroadcast(context,Constants.ACTION.NEXT);
+                    break;
+                case Constants.ACTION.PREV:
+                    universalBroadcast(context,Constants.ACTION.PREV);
             }
         }
     }

@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+
     <dimen name="title_font_size">20sp</dimen>
     <dimen name="list_font_size">18sp</dimen>
     <dimen name="list_element_height">85dp</dimen>
-    <dimen name="media_menu_size">130dp</dimen>
+    <dimen name="media_menu_portrait_size">130dp</dimen>
+    <dimen name="media_menu_landscape_size">300dp</dimen>
     <dimen name="settings_width">300dp</dimen>
+
 </resources>

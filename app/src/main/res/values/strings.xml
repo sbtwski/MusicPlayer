@@ -1,4 +1,5 @@
 <resources>
+
     <string name="app_name">MusicPlayer</string>
     <string name="about">About</string>
     <string name="settings">Settings</string>
@@ -11,8 +12,6 @@
     <string name="shuffle">Random playing order</string>
     <string name="next">Long click for track change</string>
     <string name="rewind">Long click for rewind</string>
-    <string name="rewind_seek">Rewind unit</string>
-
-
+    <string name="rewind_seek">Rewind seconds</string>
 
 </resources>

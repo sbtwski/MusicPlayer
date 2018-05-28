@@ -30,15 +30,15 @@ public class MusicService extends Service {
     private Handler durationHandler;
     LocalBroadcastManager manager;
     NotificationCompat.Builder builder;
-    NotificationManagerCompat notifManager;
+    NotificationManagerCompat notificationManager;
     IntentFilter localBroadcastFilter;
     BroadcastReceiver localBroadcastReceiver;
+    PendingIntent previousPendingIntent, playPendingIntent, nextPendingIntent, appPendingIntent;
     private int playedPosition = -1;
-    private int rewindAmount = 10000;
+    private int rewindAmount = Constants.FUNCTIONAL.REWIND_AMOUNT;
     private int currentDuration = 0;
     private int fullTime = 0;
     private boolean shuffle = false;
-    private static final String LOG_TAG = "MusicService";
     public static boolean IS_SERVICE_RUNNING = false;
     public static boolean IS_MUSIC_STARTED = false;
 
@@ -54,7 +54,7 @@ public class MusicService extends Service {
         durationHandler = new Handler();
         player = new MediaPlayer();
         manager = LocalBroadcastManager.getInstance(this);
-        notifManager = NotificationManagerCompat.from(this);
+        notificationManager = NotificationManagerCompat.from(this);
     }
 
     @Nullable
@@ -68,105 +68,73 @@ public class MusicService extends Service {
         String action = intent.getAction();
 
         if(action != null) {
-            if (action.equals(Constants.ACTION.START_SERVICE)) {
-                database = intent.getParcelableArrayListExtra(Constants.EXTRAS.DATABASE);
-                playedPosition = intent.getIntExtra(Constants.EXTRAS.PLAYED_POSITION, -1);
-                rewindAmount = intent.getIntExtra(Constants.EXTRAS.REWIND_AMOUNT, 10000);
-                shuffle = intent.getBooleanExtra(Constants.EXTRAS.SHUFFLE_USE, false);
-                IS_SERVICE_RUNNING = true;
-                builder = new NotificationCompat.Builder(this, "music_player");
+            switch (action) {
+                case Constants.ACTION.START_SERVICE:
+                    database = intent.getParcelableArrayListExtra(Constants.EXTRAS.DATABASE);
+                    playedPosition = intent.getIntExtra(Constants.EXTRAS.PLAYED_POSITION, -1);
+                    rewindAmount = intent.getIntExtra(Constants.EXTRAS.REWIND_AMOUNT, Constants.FUNCTIONAL.REWIND_AMOUNT);
+                    shuffle = intent.getBooleanExtra(Constants.EXTRAS.SHUFFLE_USE, false);
+                    currentDuration = intent.getIntExtra(Constants.EXTRAS.CURRENT_DURATION, 0);
+                    IS_SERVICE_RUNNING = true;
+                    builder = new NotificationCompat.Builder(this, "music_player");
 
-                if (playedPosition != -1) {
-                    builder.setContentTitle(database.get(playedPosition).getTitle());
-                    builder.setContentText(database.get(playedPosition).getAuthor());
-                } else {
-                    builder.setContentTitle("");
-                    builder.setContentText("");
-                }
+                    if (playedPosition != -1) {
+                        builder.setContentTitle(database.get(playedPosition).getTitle());
+                        builder.setContentText(database.get(playedPosition).getAuthor());
+                    } else {
+                        builder.setContentTitle("");
+                        builder.setContentText("");
+                    }
 
-                addListener();
+                    addListener();
+                    setupIntents();
+                    baseNotificationBuild();
+                    startForeground(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, builder.build());
 
-                Intent previousIntent = new Intent(getApplicationContext(), MyBroadcastReceiver.class);
-                previousIntent.setAction(Constants.ACTION.PREV);
-                PendingIntent previousPendingIntent =
-                        PendingIntent.getBroadcast(getApplicationContext(), 0, previousIntent, 0);
+                    if(playedPosition != -1)
+                        specialStart();
+                    if(player.isPlaying())
+                        changeIcon();
+                    break;
 
-                Intent playIntent = new Intent(getApplicationContext(), MyBroadcastReceiver.class);
-                playIntent.setAction(Constants.ACTION.PLAY_PAUSE);
-                PendingIntent playPendingIntent =
-                        PendingIntent.getBroadcast(getApplicationContext(), 0, playIntent, 0);
+                case Constants.ACTION.CHOICE:
+                    int position = intent.getIntExtra(Constants.EXTRAS.CLICKED_POSITION, 0);
+                    Song clicked = database.get(position);
+                    updateNotification(clicked);
 
-                Intent nextIntent = new Intent(getApplicationContext(), MyBroadcastReceiver.class);
-                nextIntent.setAction(Constants.ACTION.NEXT);
-                PendingIntent nextPendingIntent =
-                        PendingIntent.getBroadcast(getApplicationContext(), 0, nextIntent, 0);
+                    if(!player.isPlaying()) {
+                        IS_MUSIC_STARTED = true;
+                        playerSetup(clicked, position);
+                        durationHandler.postDelayed(updateDuration, MUSIC_REFRESH_DELAY);
+                        changeIcon();
+                    }
+                    else {
+                        if(playedPosition == position)
+                            playPause();
+                        else
+                            changeTrack(position);
+                    }
+                    break;
 
-                Intent appIntent = new Intent(this, MainActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                PendingIntent appPendingIntent = PendingIntent.getActivity(this, 0, appIntent, 0);
+                case Constants.ACTION.PLAY_PAUSE: playPause(); break;
+                case Constants.ACTION.FORWARD: goForward(); break;
+                case Constants.ACTION.NEXT: startNext(); break;
+                case Constants.ACTION.PREV: startPrevious(); break;
+                case Constants.ACTION.REWIND: goRewind(); break;
 
-                builder
-                        .setDeleteIntent(MediaButtonReceiver.buildMediaButtonPendingIntent(this,
-                                PlaybackStateCompat.ACTION_STOP))
-                        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                        .setSmallIcon(R.mipmap.ic_launcher)
-                        .setColor(ContextCompat.getColor(this, R.color.colorAccent))
-                        .addAction(R.drawable.ic_rewind, "previous", previousPendingIntent)
-                        .addAction(R.drawable.ic_play_borderless, "pause", playPendingIntent)
-                        .addAction(R.drawable.ic_forward, "next", nextPendingIntent)
-                        .setStyle(new android.support.v4.media.app.NotificationCompat.MediaStyle()
-                                .setShowActionsInCompactView(0,1,2))
-                        .setContentIntent(appPendingIntent)
-                        .setOngoing(true);
+                case Constants.ACTION.MOVE_DURATION:
+                    int progress = intent.getIntExtra(Constants.EXTRAS.PROGRESS,0);
+                    player.seekTo(progress);
+                    basicBroadcast();
+                    break;
 
-
-                startForeground(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, builder.build());
-
-                if(player.isPlaying())
-                    changeIcon();
-            }
-            if(action.equals(Constants.ACTION.CHOICE)) {
-                int position = intent.getIntExtra(Constants.EXTRAS.CLICKED_POSITION, 0);
-                Song clicked = database.get(position);
-                updateNotification(clicked);
-
-                if(!player.isPlaying()) {
-                    IS_MUSIC_STARTED = true;
-                    playerSetup(clicked, position);
-                    durationHandler.postDelayed(updateDuration, MUSIC_REFRESH_DELAY);
-                    changeIcon();
-                }
-                else {
-                    if(playedPosition == position)
-                        playPause();
-                    else
-                        changeTrack(position);
-                }
-            }
-            if(action.equals(Constants.ACTION.PLAY_PAUSE))
-                playPause();
-            if(action.equals(Constants.ACTION.FORWARD))
-                goForward();
-            if(action.equals(Constants.ACTION.NEXT))
-                startNext();
-            if(action.equals(Constants.ACTION.PREV))
-                startPrevious();
-            if(action.equals(Constants.ACTION.REWIND))
-                goRewind();
-            if(action.equals(Constants.ACTION.MOVE_DURATION)) {
-                int progress = intent.getIntExtra(Constants.EXTRAS.PROGRESS,0);
-                player.seekTo(progress);
-                basicBroadcast();
-            }
-            if(action.equals(Constants.ACTION.SETTINGS_UPDATE)) {
-                shuffle = intent.getBooleanExtra(Constants.EXTRAS.SHUFFLE_USE, false);
-                rewindAmount = intent.getIntExtra(Constants.EXTRAS.REWIND_AMOUNT, 10000);
+                case Constants.ACTION.SETTINGS_UPDATE:
+                    shuffle = intent.getBooleanExtra(Constants.EXTRAS.SHUFFLE_USE, false);
+                    rewindAmount = intent.getIntExtra(Constants.EXTRAS.REWIND_AMOUNT, Constants.FUNCTIONAL.REWIND_AMOUNT);
             }
         }
         return START_STICKY;
     }
-
-    //TODO Nie ogarnia widoków i crashuje jak się wróci po zminimalizowaniu apki i próbuje wybrać utwór
 
     @Override
     public void onDestroy() {
@@ -175,6 +143,61 @@ public class MusicService extends Service {
             player.stop();
         player.release();
         unregisterReceiver(localBroadcastReceiver);
+    }
+
+    private void setupIntents() {
+        Intent previousIntent = new Intent(getApplicationContext(), MyBroadcastReceiver.class);
+        previousIntent.setAction(Constants.ACTION.PREV);
+        previousPendingIntent = PendingIntent.getBroadcast(getApplicationContext(), 0, previousIntent, 0);
+
+        Intent playIntent = new Intent(getApplicationContext(), MyBroadcastReceiver.class);
+        playIntent.setAction(Constants.ACTION.PLAY_PAUSE);
+        playPendingIntent = PendingIntent.getBroadcast(getApplicationContext(), 0, playIntent, 0);
+
+        Intent nextIntent = new Intent(getApplicationContext(), MyBroadcastReceiver.class);
+        nextIntent.setAction(Constants.ACTION.NEXT);
+        nextPendingIntent = PendingIntent.getBroadcast(getApplicationContext(), 0, nextIntent, 0);
+
+        Intent appIntent = new Intent(this, MainActivity.class);
+        appPendingIntent = PendingIntent.getActivity(this, 0, appIntent, 0);
+    }
+
+    private void baseNotificationBuild() {
+        builder
+                .setDeleteIntent(MediaButtonReceiver.buildMediaButtonPendingIntent(this,
+                        PlaybackStateCompat.ACTION_STOP))
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setColor(ContextCompat.getColor(this, R.color.colorAccent))
+                .addAction(R.drawable.ic_rewind, "previous", previousPendingIntent)
+                .addAction(R.drawable.ic_play_borderless, "pause", playPendingIntent)
+                .addAction(R.drawable.ic_forward, "next", nextPendingIntent)
+                .setStyle(new android.support.v4.media.app.NotificationCompat.MediaStyle()
+                        .setShowActionsInCompactView(0,1,2))
+                .setContentIntent(appPendingIntent)
+                .setOngoing(true);
+    }
+
+    private void specialStart() {
+        Song alreadyStarted = database.get(playedPosition);
+        specialPlayerSetup(alreadyStarted);
+        player.seekTo(currentDuration);
+        IS_MUSIC_STARTED = true;
+        durationHandler.postDelayed(updateDuration, MUSIC_REFRESH_DELAY);
+    }
+
+    private void specialPlayerSetup(Song clicked) {
+        player.reset();
+
+        try { player.setDataSource(getApplicationContext(), Uri.parse(clicked.getFilename())); }
+        catch (Exception e) { Log.e("player_start","File not found"); }
+
+        try { player.prepare(); }
+        catch (Exception e) { Log.e("player_prepare","Preparation failed"); }
+
+        player.start();
+        player.pause();
+        fullTime = player.getDuration();
     }
 
     private void playerSetup(Song clicked, int playedPosition) {
@@ -188,7 +211,7 @@ public class MusicService extends Service {
 
         player.start();
         fullTime = player.getDuration();
-        fulltimeBroadcast();
+        fullTimeBroadcast();
         this.playedPosition = playedPosition;
     }
 
@@ -201,7 +224,7 @@ public class MusicService extends Service {
             player.start();
             changeIcon();
         }
-        playpauseBroadcast();
+        playPauseBroadcast();
     }
 
     private void changeIcon() {
@@ -211,26 +234,17 @@ public class MusicService extends Service {
             builder.mActions.get(1).icon = R.drawable.ic_play_borderless;
         else
             builder.mActions.get(1).icon = R.drawable.ic_pause_borderless;
-        notifManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, builder.build());
+        notificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, builder.build());
     }
 
     private void goForward() {
-        Log.d("FORWARD","Forward at all");
         if(currentDuration > FORWARD_COOLDOWN) {
             if (currentDuration + rewindAmount < fullTime) {
-                Log.d("FORWARD","Forward second if");
                 currentDuration += rewindAmount;
                 player.seekTo(currentDuration);
             } else
                 player.seekTo(fullTime);
         }
-    }
-
-    private void startNext() {
-        if(!player.isPlaying())
-            changeIcon();
-        if(shuffle) useShuffle();
-        else changeTrack(playedPosition + 1);
     }
 
     private void goRewind() {
@@ -240,6 +254,13 @@ public class MusicService extends Service {
         }
         else
             player.seekTo(0);
+    }
+
+    private void startNext() {
+        if(!player.isPlaying())
+            changeIcon();
+        if(shuffle) useShuffle();
+        else changeTrack(playedPosition + 1);
     }
 
     private void startPrevious() {
@@ -256,13 +277,33 @@ public class MusicService extends Service {
         changeTrack(shuffledPosition);
     }
 
+    private void changeTrack(int newPosition) {
+        if(newPosition < 0 || newPosition >= database.size()) {
+            if(newPosition < 0)
+                newPosition = database.size() - 1;
+            else
+                newPosition = 0;
+        }
+        Song newTrack = database.get(newPosition);
+        playerSetup(newTrack, newPosition);
+        durationHandler.postDelayed(updateDuration, MUSIC_REFRESH_DELAY);
+        trackChangeBroadcast();
+        updateNotification(newTrack);
+    }
+
+    private void updateNotification(Song source) {
+        builder.setContentTitle(source.getTitle());
+        builder.setContentText(source.getAuthor());
+        notificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, builder.build());
+    }
+
     public void basicBroadcast() {
         Intent intent = new Intent(Constants.BROADCASTS.BASIC);
         intent.putExtra(Constants.EXTRAS.CURRENT_DURATION, currentDuration);
         manager.sendBroadcast(intent);
     }
 
-    public void playpauseBroadcast() {
+    public void playPauseBroadcast() {
         Intent intent = new Intent(Constants.BROADCASTS.PLAY_PAUSE);
         intent.putExtra(Constants.EXTRAS.IS_PLAYING, player.isPlaying());
         manager.sendBroadcast(intent);
@@ -275,7 +316,7 @@ public class MusicService extends Service {
         manager.sendBroadcast(intent);
     }
 
-    public void fulltimeBroadcast() {
+    public void fullTimeBroadcast() {
         Intent intent = new Intent(Constants.BROADCASTS.FULLTIME);
         intent.putExtra(Constants.EXTRAS.FULL_TIME, player.getDuration());
         manager.sendBroadcast(intent);
@@ -288,26 +329,6 @@ public class MusicService extends Service {
             basicBroadcast();
         }
     };
-
-    private void changeTrack(int newPosition) {
-        if(newPosition >= 0 && newPosition < database.size()) {
-            Song newTrack = database.get(newPosition);
-            playerSetup(newTrack, newPosition);
-            durationHandler.postDelayed(updateDuration, MUSIC_REFRESH_DELAY);
-            trackChangeBroadcast();
-            updateNotification(newTrack);
-        }
-        else {
-            player.pause();
-            changeIcon();
-        }
-    }
-
-    private void updateNotification(Song source) {
-        builder.setContentTitle(source.getTitle());
-        builder.setContentText(source.getAuthor());
-        notifManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, builder.build());
-    }
 
     private void addListener() {
         player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
@@ -322,7 +343,7 @@ public class MusicService extends Service {
                         player.seekTo(0);
                         player.pause();
                         changeIcon();
-                        playpauseBroadcast();
+                        playPauseBroadcast();
                     }
                 }
             }
