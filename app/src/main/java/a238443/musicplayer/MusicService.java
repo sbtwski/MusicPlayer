@@ -112,7 +112,7 @@ public class MusicService extends Service {
                         .setSmallIcon(R.mipmap.ic_launcher)
                         .setColor(ContextCompat.getColor(this, R.color.colorAccent))
                         .addAction(R.drawable.ic_rewind, "previous", previousPendingIntent)
-                        .addAction(R.drawable.ic_pause_borderless, "pause", playPendingIntent)
+                        .addAction(R.drawable.ic_play_borderless, "pause", playPendingIntent)
                         .addAction(R.drawable.ic_forward, "next", nextPendingIntent)
                         .setStyle(new android.support.v4.media.app.NotificationCompat.MediaStyle()
                                 .setShowActionsInCompactView(0,1,2))
@@ -121,6 +121,9 @@ public class MusicService extends Service {
 
 
                 startForeground(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, builder.build());
+
+                if(player.isPlaying())
+                    changeIcon();
             }
             if(action.equals(Constants.ACTION.CHOICE)) {
                 int position = intent.getIntExtra(Constants.EXTRAS.CLICKED_POSITION, 0);
@@ -131,6 +134,7 @@ public class MusicService extends Service {
                     IS_MUSIC_STARTED = true;
                     playerSetup(clicked, position);
                     durationHandler.postDelayed(updateDuration, MUSIC_REFRESH_DELAY);
+                    changeIcon();
                 }
                 else {
                     if(playedPosition == position)
@@ -171,7 +175,6 @@ public class MusicService extends Service {
             player.stop();
         player.release();
         unregisterReceiver(localBroadcastReceiver);
-        Log.i(LOG_TAG, "In onDestroy");
     }
 
     private void playerSetup(Song clicked, int playedPosition) {
@@ -192,11 +195,23 @@ public class MusicService extends Service {
     private void playPause() {
         if(player.isPlaying()) {
             player.pause();
+            changeIcon();
         }
         else {
             player.start();
+            changeIcon();
         }
         playpauseBroadcast();
+    }
+
+    private void changeIcon() {
+        int currentIcon = builder.mActions.get(1).icon;
+
+        if(currentIcon == R.drawable.ic_pause_borderless)
+            builder.mActions.get(1).icon = R.drawable.ic_play_borderless;
+        else
+            builder.mActions.get(1).icon = R.drawable.ic_pause_borderless;
+        notifManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, builder.build());
     }
 
     private void goForward() {
@@ -212,6 +227,8 @@ public class MusicService extends Service {
     }
 
     private void startNext() {
+        if(!player.isPlaying())
+            changeIcon();
         if(shuffle) useShuffle();
         else changeTrack(playedPosition + 1);
     }
@@ -226,6 +243,8 @@ public class MusicService extends Service {
     }
 
     private void startPrevious() {
+        if(!player.isPlaying())
+            changeIcon();
         if(shuffle) useShuffle();
         else changeTrack(playedPosition - 1);
     }
@@ -280,6 +299,7 @@ public class MusicService extends Service {
         }
         else {
             player.pause();
+            changeIcon();
         }
     }
 
@@ -300,7 +320,9 @@ public class MusicService extends Service {
                     }
                     else {
                         player.seekTo(0);
-                        playPause();
+                        player.pause();
+                        changeIcon();
+                        playpauseBroadcast();
                     }
                 }
             }

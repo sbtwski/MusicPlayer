@@ -7,38 +7,14 @@ import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.TextView;
 
 import java.util.ArrayList;
 
-public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.SongHolder> {
+public class RecyclerAdapter extends RecyclerView.Adapter<SongHolder> {
     private ArrayList<Song> database = new ArrayList<>();
     private ClickHandler adapterClickHandler;
     private Context appContext;
-
-    class SongHolder extends RecyclerView.ViewHolder implements View.OnClickListener{
-        private ClickHandler songClickHandler;
-        TextView titleText, authorText, lengthText;
-        Button playButton;
-
-        SongHolder(View itemView) {
-            super(itemView);
-
-            titleText = itemView.findViewById(R.id.list_title);
-            authorText = itemView.findViewById(R.id.list_author);
-            lengthText = itemView.findViewById(R.id.list_song_length);
-            playButton = itemView.findViewById(R.id.play_pause_list);
-
-            playButton.setOnClickListener(this);
-        }
-
-        @Override
-        public void onClick(View v) {
-            if(songClickHandler != null)
-                songClickHandler.onButtonClicked(v, getAdapterPosition());
-        }
-    }
 
     RecyclerAdapter(ClickHandler adapterClickHandler, Context appContext) {
         database = new ArrayList<>();
@@ -47,7 +23,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.SongHo
     }
 
     @Override
-    public void onBindViewHolder(RecyclerAdapter.SongHolder songHolder, int i) {
+    public void onBindViewHolder(SongHolder songHolder, int i) {
         TextView title = songHolder.titleText;
         TextView author = songHolder.authorText;
         TextView length = songHolder.lengthText;
@@ -63,7 +39,7 @@ public class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.SongHo
     }
 
     @Override
-    public RecyclerAdapter.SongHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+    public SongHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         LayoutInflater inflater = LayoutInflater.from(parent.getContext());
         View view = inflater.inflate(R.layout.list_item, parent, false);
         return new SongHolder(view);

@@ -49,10 +49,11 @@ public class MainActivity extends AppCompatActivity{
     Button playOnListButton, playMenu, forwardMenu, rewindMenu;
     RelativeLayout forRecycler;
     View mediaControl;
-    TextView durationMenu, titleMenu, fullTimeMenu;
+    TextView durationMenu, titleMenu, fullTimeMenu, titleToBold;
     SeekBar seekMenu;
     Handler durationHandler;
     Handler seekBarHandler;
+    Handler updateUIHandler;
     IntentFilter localBroadcastFilter;
     LocalBroadcastManager manager;
     PreCachingLayoutManager layoutManager;
@@ -94,6 +95,7 @@ public class MainActivity extends AppCompatActivity{
 
         durationHandler = new Handler();
         seekBarHandler = new Handler();
+        updateUIHandler = new Handler();
         seekMenu.setClickable(true);
         manageSeekBar();
         manageService();
@@ -106,12 +108,6 @@ public class MainActivity extends AppCompatActivity{
 
         manager = LocalBroadcastManager.getInstance(this);
         manager.registerReceiver(localBroadcastReceiver, localBroadcastFilter);
-
-        /*if(playedPosition != -1) {
-            showMediaControl();
-            menuChange(mainAdapter.getItem(playedPosition), currentDuration);
-            indicatePlayed(playedPosition);
-        }*/
     }
 
     //TODO pauza nie zmienia się na play na ekranie blokady
@@ -119,11 +115,14 @@ public class MainActivity extends AppCompatActivity{
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-            deleteChannel();
-        /*Intent service = new Intent(this, MusicService.class);
-        stopService(service);*/
-        manager.unregisterReceiver(localBroadcastReceiver);
+
+        if(isFinishing()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                deleteChannel();
+            Intent service = new Intent(this, MusicService.class);
+            stopService(service);
+            manager.unregisterReceiver(localBroadcastReceiver);
+        }
     }
 
     @Override
@@ -135,11 +134,13 @@ public class MainActivity extends AppCompatActivity{
     @Override
     protected void onResume() {
         super.onResume();
+
         if(playedPosition != -1) {
             showMediaControl();
             menuChange(mainAdapter.getItem(playedPosition), currentDuration);
-            //simplifiedIndicate(playedPosition);
+            updateUI.run();
         }
+
         updateSeekBarTime.run();
     }
 
@@ -210,6 +211,7 @@ public class MainActivity extends AppCompatActivity{
     private void findAll() {
         recyclerView = findViewById(R.id.main_recyclerView);
         playOnListButton = findViewById(R.id.play_pause_list);
+        titleToBold = findViewById(R.id.list_title);
         mediaControl = findViewById(R.id.media_control);
         forRecycler = findViewById(R.id.for_recycler);
         durationMenu = findViewById(R.id.current_duration);
@@ -237,9 +239,7 @@ public class MainActivity extends AppCompatActivity{
                     menuChange(clicked, 0);
                     playedPosition = position;
                     indicatePlayed(position);
-
-                    playOnListButton = itemView.findViewById(R.id.play_pause_list);
-                    playOnListButton.setBackground(getDrawable(R.drawable.ic_pause));
+                    invertPlayIcon(playedPosition, true);
 
                     durationHandler.postDelayed(updateSeekBarTime, MUSIC_REFRESH_DELAY);
                 }
@@ -326,6 +326,8 @@ public class MainActivity extends AppCompatActivity{
         params.setMargins(0,0,0,dpToPx((int)getResources().getDimension(R.dimen.media_menu_size)));
         recyclerView.setLayoutParams(params);
         mediaControl.setVisibility(View.VISIBLE);
+        if(playedPosition != -1)
+            playMenu.setBackground(getDrawable(R.drawable.ic_play));
     }
 
     private int dpToPx(int dp){
@@ -334,14 +336,13 @@ public class MainActivity extends AppCompatActivity{
         return dp * (metrics.densityDpi / DisplayMetrics.DENSITY_DEFAULT) / 2;
     }
 
-    private void playPause(boolean isPlaying) {
-        View newTrackView = recyclerView.getLayoutManager().findViewByPosition(playedPosition);
-        playOnListButton = newTrackView.findViewById(R.id.play_pause_list);
-        if(!isPlaying) {
+    private void invertPlayIcon(int position, boolean playOn) {
+        loadIconView(position);
+
+        if (!playOn) {
             playOnListButton.setBackground(getDrawable(R.drawable.ic_play));
             playMenu.setBackground(getDrawable(R.drawable.ic_play));
-        }
-        else {
+        } else {
             playOnListButton.setBackground(getDrawable(R.drawable.ic_pause));
             playMenu.setBackground(getDrawable(R.drawable.ic_pause));
         }
@@ -349,24 +350,32 @@ public class MainActivity extends AppCompatActivity{
 
     private void changeTrack(int newPosition, boolean fromService) {
         Song newTrack = mainAdapter.getItem(newPosition);
-        View newTrackView = recyclerView.getLayoutManager().findViewByPosition(playedPosition);
 
-        if(newTrackView != null) {
-            playOnListButton = newTrackView.findViewById(R.id.play_pause_list);
-            indicatePlayed(newPosition);
-            playedPosition = newPosition;
-            if(!fromService)
-                updateServiceTrack(newPosition);
+        invertPlayIcon(playedPosition, false);
+        indicatePlayed(newPosition);
+        playedPosition = newPosition;
+        invertPlayIcon(playedPosition, true);
+        if(!fromService)
+            updateServiceTrack(newPosition);
 
-            newTrackView = recyclerView.getLayoutManager().findViewByPosition(playedPosition);
-            playOnListButton.setBackground(getDrawable(R.drawable.ic_play));
-            playOnListButton = newTrackView.findViewById(R.id.play_pause_list);
-            playOnListButton.setBackground(getDrawable(R.drawable.ic_pause));
-            playMenu.setBackground(getDrawable(R.drawable.ic_pause));
+        menuChange(newTrack, 0);
 
-            menuChange(newTrack, 0);
-        }
         durationHandler.postDelayed(updateSeekBarTime, MUSIC_REFRESH_DELAY);
+    }
+
+    private boolean loadTitleView(int position) {
+        SongHolder newTrackView = (SongHolder)recyclerView.findViewHolderForAdapterPosition(position);
+        if(newTrackView != null) {
+            titleToBold = newTrackView.titleText;
+            return true;
+        }
+        return false;
+    }
+
+    private void loadIconView(int position) {
+        SongHolder newTrackView = (SongHolder)recyclerView.findViewHolderForAdapterPosition(position);
+        if(newTrackView != null)
+            playOnListButton = newTrackView.playButton;
     }
 
     private void updateServiceTrack(int newPosition) {
@@ -375,6 +384,19 @@ public class MainActivity extends AppCompatActivity{
         service.putExtra(Constants.EXTRAS.CLICKED_POSITION, newPosition);
         ContextCompat.startForegroundService(getApplicationContext(),service);
     }
+
+    private Runnable updateUI = new Runnable() {
+        @Override
+        public void run() {
+            if(loadTitleView(playedPosition)) {
+                simplifiedIndicate(playedPosition);
+                invertPlayIcon(playedPosition, true);
+            }
+            else {
+                updateUIHandler.postDelayed(this,MUSIC_REFRESH_DELAY);
+            }
+        }
+    };
 
     private Runnable updateSeekBarTime = new Runnable() {
         public void run() {
@@ -471,27 +493,18 @@ public class MainActivity extends AppCompatActivity{
     }
 
     private void indicatePlayed(int newPosition) {
-        View trackView;
-        TextView title;
-
-        trackView = recyclerView.getLayoutManager().findViewByPosition(playedPosition);
-        if(trackView != null) {
-            title = trackView.findViewById(R.id.list_title);
-            title.setTypeface(Typeface.DEFAULT);
+        if(playedPosition != -1) {
+            loadTitleView(playedPosition);
+            titleToBold.setTypeface(Typeface.DEFAULT);
         }
-
-        trackView = recyclerView.getLayoutManager().findViewByPosition(newPosition);
-        if(trackView != null) {
-            title = trackView.findViewById(R.id.list_title);
-            title.setTypeface(Typeface.DEFAULT_BOLD);
-        }
+        loadTitleView(newPosition);
+        titleToBold.setTypeface(Typeface.DEFAULT_BOLD);
     }
 
-    /*private void simplifiedIndicate(int newPosition) {
-        View trackView = recyclerView.getLayoutManager().findViewByPosition(newPosition);
-        TextView title = trackView.findViewById(R.id.list_title);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-    }*/
+    private void simplifiedIndicate(int newPosition) {
+        loadTitleView(newPosition);
+        titleToBold.setTypeface(Typeface.DEFAULT_BOLD);
+    }
 
     private void saveUsersData() {
         SharedPreferences.Editor sp_editor = sharedPref.edit();
@@ -572,7 +585,7 @@ public class MainActivity extends AppCompatActivity{
                     currentDuration = intent.getIntExtra(Constants.EXTRAS.CURRENT_DURATION, 0);
                 }
                 else if (action.equals(Constants.BROADCASTS.PLAY_PAUSE)) {
-                    playPause(intent.getBooleanExtra(Constants.EXTRAS.IS_PLAYING, false));
+                    invertPlayIcon(playedPosition, intent.getBooleanExtra(Constants.EXTRAS.IS_PLAYING,false));
                 }
                 else if (action.equals(Constants.BROADCASTS.TRACK_CHANGE)) {
                     fullTime = intent.getIntExtra(Constants.EXTRAS.FULL_TIME, 0);
