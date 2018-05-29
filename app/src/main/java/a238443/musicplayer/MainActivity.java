@@ -273,16 +273,16 @@ public class MainActivity extends AppCompatActivity{
                     showMediaControl();
                     menuChange(clicked, 0);
                     playedPosition = position;
-                    indicatePlayed(position);
+                    indicatePlayed(position, playedPosition);
                     invertPlayIcon(playedPosition, true);
 
-                    durationHandler.postDelayed(updateSeekBarTime, MUSIC_REFRESH_DELAY);
+                    updateSeekBarTime.run();
                 }
                 else {
                     if(playedPosition == position)
                         basicServiceUpdate(Constants.ACTION.PLAY_PAUSE);
                     else
-                        changeTrack(position, false);
+                        changeTrack(position, playedPosition, false);
                 }
             }
         };
@@ -360,7 +360,8 @@ public class MainActivity extends AppCompatActivity{
     }
 
     private void invertPlayIcon(int position, boolean playOn) {
-        iconUpdate(position,playOn);
+        menuIconUpdate(playOn);
+        listIconUpdate(position,playOn);
     }
 
     private boolean loadTitleView(int position) {
@@ -381,11 +382,11 @@ public class MainActivity extends AppCompatActivity{
         return false;
     }
 
-    private void changeTrack(int newPosition, boolean fromService) {
+    private void changeTrack(int newPosition, int previousPosition,  boolean fromService) {
         Song newTrack = mainAdapter.getItem(newPosition);
 
-        invertPlayIcon(playedPosition, false);
-        indicatePlayed(newPosition);
+        invertPlayIcon(previousPosition, false);
+        indicatePlayed(newPosition, previousPosition);
         playedPosition = newPosition;
         invertPlayIcon(playedPosition, true);
         if(!fromService)
@@ -393,7 +394,7 @@ public class MainActivity extends AppCompatActivity{
 
         menuChange(newTrack, 0);
 
-        durationHandler.postDelayed(updateSeekBarTime, MUSIC_REFRESH_DELAY);
+        updateSeekBarTime.run();
     }
 
     private void updateServiceTrack(int newPosition) {
@@ -487,32 +488,36 @@ public class MainActivity extends AppCompatActivity{
         });
     }
 
-    private void iconUpdate(final int position, final boolean playState) {
+    private void menuIconUpdate(boolean playOn) {
+        if(!playOn)
+            playMenu.setBackground(getDrawable(R.drawable.ic_play));
+        else
+            playMenu.setBackground(getDrawable(R.drawable.ic_pause));
+    }
+
+    private void listIconUpdate(final int position, final boolean playState) {
         final Runnable iconUpdater = new Runnable() {
             int positionToUpdate = position;
             boolean playOn = playState;
             @Override
             public void run() {
                 if(loadIconView(positionToUpdate)){
-                    if (!playOn) {
+                    if (!playOn)
                         playOnListButton.setBackground(getDrawable(R.drawable.ic_play));
-                        playMenu.setBackground(getDrawable(R.drawable.ic_play));
-                    } else {
+                    else
                         playOnListButton.setBackground(getDrawable(R.drawable.ic_pause));
-                        playMenu.setBackground(getDrawable(R.drawable.ic_pause));
-                    }
                     updateUIHandler.removeCallbacks(this);
                 }
                 else
-                    updateUIHandler.postDelayed(this,MUSIC_REFRESH_DELAY);
+                    updateUIHandler.postDelayed(this,Constants.FUNCTIONAL.MINOR_ELEMENTS_REFRESH_DELAY);
             }
         };
         iconUpdater.run();
     }
 
-    private void indicatePlayed(int newPosition) {
-        if(playedPosition != -1)
-            typefaceUpdate(playedPosition,Typeface.DEFAULT);
+    private void indicatePlayed(int newPosition, int previouslyPlayed) {
+        if(previouslyPlayed != -1)
+            typefaceUpdate(previouslyPlayed,Typeface.DEFAULT);
         typefaceUpdate(newPosition, Typeface.DEFAULT_BOLD);
     }
 
@@ -531,7 +536,7 @@ public class MainActivity extends AppCompatActivity{
                     updateUIHandler.removeCallbacks(this);
                 }
                 else
-                    updateUIHandler.postDelayed(this,MUSIC_REFRESH_DELAY);
+                    updateUIHandler.postDelayed(this,Constants.FUNCTIONAL.MINOR_ELEMENTS_REFRESH_DELAY);
             }
         };
         typefaceUpdater.run();
@@ -569,7 +574,7 @@ public class MainActivity extends AppCompatActivity{
         if (!MusicService.IS_SERVICE_RUNNING) {
             service.setAction(Constants.ACTION.START_SERVICE);
             if(playedPosition != -1) {
-                service.putExtra(Constants.EXTRAS.PLAYED_POSITION, playedPosition);
+                service.putExtra(Constants.EXTRAS.NEW_POSITION, playedPosition);
                 service.putExtra(Constants.EXTRAS.CURRENT_DURATION, currentDuration);
             }
             service.putExtra(Constants.EXTRAS.REWIND_AMOUNT, rewindAmount);
@@ -622,7 +627,7 @@ public class MainActivity extends AppCompatActivity{
                         break;
                     case Constants.BROADCASTS.TRACK_CHANGE:
                         fullTime = intent.getIntExtra(Constants.EXTRAS.FULL_TIME, 0);
-                        changeTrack(intent.getIntExtra(Constants.EXTRAS.PLAYED_POSITION, 0), true);
+                        changeTrack(intent.getIntExtra(Constants.EXTRAS.NEW_POSITION, 0),intent.getIntExtra(Constants.EXTRAS.PLAYED_POSITION, 0), true);
                         break;
                     case Constants.BROADCASTS.FULLTIME:
                         fullTime = intent.getIntExtra(Constants.EXTRAS.FULL_TIME, 0);

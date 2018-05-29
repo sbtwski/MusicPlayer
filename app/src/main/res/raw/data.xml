@@ -32,6 +32,12 @@
     </song>
 
     <song>
+        <title>Drive</title>
+        <author>R.E.M</author>
+        <file>drive</file>
+    </song>
+
+    <song>
         <title>Fortunate Son</title>
         <author>Creedence Clearwater Revival</author>
         <file>fortunate_son</file>
@@ -44,6 +50,12 @@
     </song>
 
     <song>
+        <title>I Still Haven't Found What I'm Looking For</title>
+        <author>U2</author>
+        <file>still_havent_found</file>
+    </song>
+
+    <song>
         <title>The End</title>
         <author>The Doors</author>
         <file>the_end</file>
@@ -53,18 +65,6 @@
         <title>The House Of The Rising Sun</title>
         <author>The White Buffalo</author>
         <file>the_house_of_the_rising_sun</file>
-    </song>
-
-    <song>
-        <title>The Rains Of Castamere</title>
-        <author>Sigur Ros</author>
-        <file>the_rains_of_castamere</file>
-    </song>
-
-    <song>
-        <title>Warship My Wreck</title>
-        <author>Marilyn Manson</author>
-        <file>warship_my_wreck</file>
     </song>
 
 </feed>

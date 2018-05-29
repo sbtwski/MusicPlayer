@@ -3,27 +3,28 @@ package a238443.musicplayer;
 class Constants {
 
     public interface ACTION {
-        String PREV = "action.prev";
-        String CHOICE = "action.choice";
-        String PLAY_PAUSE = "action.status";
-        String NEXT = "action.next";
-        String REWIND = "action.rewind";
-        String FORWARD = "action.forward";
-        String MOVE_DURATION = "action.move";
-        String SETTINGS_UPDATE = "action.settings";
-        String START_SERVICE = "action.stop";
+        String PREV = "act.prev";
+        String CHOICE = "act.choice";
+        String PLAY_PAUSE = "act.status";
+        String NEXT = "act.next";
+        String REWIND = "act.rewind";
+        String FORWARD = "act.forward";
+        String MOVE_DURATION = "act.move";
+        String SETTINGS_UPDATE = "act.settings";
+        String START_SERVICE = "act.stop";
     }
 
     public interface EXTRAS {
-        String PLAYED_POSITION = "extras.position";
-        String SHUFFLE_USE = "extras.shuffle";
-        String REWIND_AMOUNT = "extras.rewind";
-        String DATABASE = "extras.database";
-        String CLICKED_POSITION = "extras.clicked";
-        String CURRENT_DURATION = "extras.duration";
-        String IS_PLAYING = "extras.playing";
-        String FULL_TIME = "extras.full";
-        String PROGRESS = "extras.progress";
+        String NEW_POSITION = "ext.position";
+        String PLAYED_POSITION = "ext.played";
+        String SHUFFLE_USE = "ext.shuffle";
+        String REWIND_AMOUNT = "ext.rewind";
+        String DATABASE = "ext.database";
+        String CLICKED_POSITION = "ext.clicked";
+        String CURRENT_DURATION = "ext.duration";
+        String IS_PLAYING = "ext.playing";
+        String FULL_TIME = "ext.full";
+        String PROGRESS = "ext.progress";
     }
 
     public interface NOTIFICATION_ID {
@@ -31,19 +32,21 @@ class Constants {
     }
 
     public interface FUNCTIONAL {
-        int FORWARD_COOLDOWN = 1500;
-        int REWIND_MENU_REFRESH_DELAY = 200;
-        int MUSIC_REFRESH_DELAY = 100;
-        int REWIND_SET_REFRESH_DELAY = 200;
-        int UI_UPDATE_REFRESH_DELAY = 300;
+        int FORWARD_COOLDOWN = 500;
+        int REWIND_MENU_REFRESH_DELAY = 400;
+        int MUSIC_REFRESH_DELAY = 800;
+        int REWIND_SET_REFRESH_DELAY = 700;
+        int UI_UPDATE_REFRESH_DELAY = 800;
+        int MINOR_ELEMENTS_REFRESH_DELAY = 75;
+        int DURATION_BROADCAST_REFRESH_DELAY = 850;
         int REWIND_AMOUNT = 10000;
         int CHANGE_ATTEMPTS = 2;
     }
 
     public interface BROADCASTS {
-        String BASIC = "broadcasts.basic";
-        String TRACK_CHANGE = "broadcasts.track";
-        String PLAY_PAUSE = "broadcasts.play";
-        String FULLTIME = "broadcasts.fulltime";
+        String BASIC = "brd.basic";
+        String TRACK_CHANGE = "brd.track";
+        String PLAY_PAUSE = "brd.play";
+        String FULLTIME = "brd.fulltime";
     }
 }

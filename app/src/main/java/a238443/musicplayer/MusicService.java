@@ -71,7 +71,7 @@ public class MusicService extends Service {
             switch (action) {
                 case Constants.ACTION.START_SERVICE:
                     database = intent.getParcelableArrayListExtra(Constants.EXTRAS.DATABASE);
-                    playedPosition = intent.getIntExtra(Constants.EXTRAS.PLAYED_POSITION, -1);
+                    playedPosition = intent.getIntExtra(Constants.EXTRAS.NEW_POSITION, -1);
                     rewindAmount = intent.getIntExtra(Constants.EXTRAS.REWIND_AMOUNT, Constants.FUNCTIONAL.REWIND_AMOUNT);
                     shuffle = intent.getBooleanExtra(Constants.EXTRAS.SHUFFLE_USE, false);
                     currentDuration = intent.getIntExtra(Constants.EXTRAS.CURRENT_DURATION, 0);
@@ -105,7 +105,7 @@ public class MusicService extends Service {
                     if(!player.isPlaying()) {
                         IS_MUSIC_STARTED = true;
                         playerSetup(clicked, position);
-                        durationHandler.postDelayed(updateDuration, MUSIC_REFRESH_DELAY);
+                        updateDuration.run();
                         changeIcon();
                     }
                     else {
@@ -183,7 +183,7 @@ public class MusicService extends Service {
         specialPlayerSetup(alreadyStarted);
         player.seekTo(currentDuration);
         IS_MUSIC_STARTED = true;
-        durationHandler.postDelayed(updateDuration, MUSIC_REFRESH_DELAY);
+        updateDuration.run();
     }
 
     private void specialPlayerSetup(Song clicked) {
@@ -285,9 +285,10 @@ public class MusicService extends Service {
                 newPosition = 0;
         }
         Song newTrack = database.get(newPosition);
+        int previous = playedPosition;
         playerSetup(newTrack, newPosition);
-        durationHandler.postDelayed(updateDuration, MUSIC_REFRESH_DELAY);
-        trackChangeBroadcast();
+        trackChangeBroadcast(previous);
+        updateDuration.run();
         updateNotification(newTrack);
     }
 
@@ -309,9 +310,10 @@ public class MusicService extends Service {
         manager.sendBroadcast(intent);
     }
 
-    public void trackChangeBroadcast() {
+    public void trackChangeBroadcast(int previouslyPlayed) {
         Intent intent = new Intent(Constants.BROADCASTS.TRACK_CHANGE);
-        intent.putExtra(Constants.EXTRAS.PLAYED_POSITION, playedPosition);
+        intent.putExtra(Constants.EXTRAS.NEW_POSITION, playedPosition);
+        intent.putExtra(Constants.EXTRAS.PLAYED_POSITION, previouslyPlayed);
         intent.putExtra(Constants.EXTRAS.FULL_TIME, player.getDuration());
         manager.sendBroadcast(intent);
     }
@@ -325,7 +327,7 @@ public class MusicService extends Service {
     private Runnable updateDuration = new Runnable() {
         public void run() {
             currentDuration = player.getCurrentPosition();
-            durationHandler.postDelayed(this, MUSIC_REFRESH_DELAY);
+            durationHandler.postDelayed(this, Constants.FUNCTIONAL.DURATION_BROADCAST_REFRESH_DELAY);
             basicBroadcast();
         }
     };
