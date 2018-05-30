@@ -77,6 +77,8 @@ public class MainActivity extends AppCompatActivity{
 
         layoutManager = new PreCachingLayoutManager(getApplicationContext());
         layoutManager.setOrientation(LinearLayoutManager.VERTICAL);
+        layoutManager.setItemPrefetchEnabled(true);
+        layoutManager.setInitialPrefetchItemCount(15);
         layoutManager.setExtraLayoutSpace(getScreenHeight());
 
         sharedPref = getSharedPreferences(getString(R.string.user_saves), Activity.MODE_PRIVATE);
@@ -203,7 +205,7 @@ public class MainActivity extends AppCompatActivity{
         simplifiedIndicate(playedPosition);
         if(savedInstanceState != null)
             callStart = savedInstanceState.getBoolean("callStart", true);
-        if(callStart) {
+        if(callStart || !MusicService.IS_PLAYING) {
             Runnable playChange = new Runnable() {
                 int counter = Constants.FUNCTIONAL.CHANGE_ATTEMPTS;
                 @Override
@@ -499,17 +501,22 @@ public class MainActivity extends AppCompatActivity{
         final Runnable iconUpdater = new Runnable() {
             int positionToUpdate = position;
             boolean playOn = playState;
+            int attempts = 100;
             @Override
             public void run() {
-                if(loadIconView(positionToUpdate)){
-                    if (!playOn)
-                        playOnListButton.setBackground(getDrawable(R.drawable.ic_play));
-                    else
-                        playOnListButton.setBackground(getDrawable(R.drawable.ic_pause));
+                if(loadIconView(positionToUpdate) || attempts == 0){
+                    if(attempts > 0) {
+                        if (!playOn)
+                            playOnListButton.setBackground(getDrawable(R.drawable.ic_play));
+                        else
+                            playOnListButton.setBackground(getDrawable(R.drawable.ic_pause));
+                    }
                     updateUIHandler.removeCallbacks(this);
                 }
-                else
-                    updateUIHandler.postDelayed(this,Constants.FUNCTIONAL.MINOR_ELEMENTS_REFRESH_DELAY);
+                else {
+                    attempts--;
+                    updateUIHandler.postDelayed(this, Constants.FUNCTIONAL.MINOR_ELEMENTS_REFRESH_DELAY);
+                }
             }
         };
         iconUpdater.run();
@@ -529,14 +536,20 @@ public class MainActivity extends AppCompatActivity{
         Runnable typefaceUpdater = new Runnable() {
             int positionToUpdate = position;
             Typeface typefaceToUpdate = typeface;
+            int attempts = 100;
             @Override
             public void run() {
-                if(loadTitleView(positionToUpdate)) {
-                    titleToBold.setTypeface(typefaceToUpdate);
+                if(loadTitleView(positionToUpdate) || attempts == 0) {
+                    if(attempts > 0)
+                        titleToBold.setTypeface(typefaceToUpdate);
                     updateUIHandler.removeCallbacks(this);
+                    Log.i("BoldHandler", "Done on positon "+position);
                 }
-                else
-                    updateUIHandler.postDelayed(this,Constants.FUNCTIONAL.MINOR_ELEMENTS_REFRESH_DELAY);
+                else {
+                    Log.i("BoldHandler", "On position "+position);
+                    attempts --;
+                    updateUIHandler.postDelayed(this, Constants.FUNCTIONAL.MINOR_ELEMENTS_REFRESH_DELAY);
+                }
             }
         };
         typefaceUpdater.run();
@@ -581,9 +594,10 @@ public class MainActivity extends AppCompatActivity{
             service.putExtra(Constants.EXTRAS.SHUFFLE_USE, shuffle);
             service.putExtra(Constants.EXTRAS.DATABASE, mainAdapter.getDatabase());
             MusicService.IS_SERVICE_RUNNING = true;
+            ContextCompat.startForegroundService(getApplicationContext(),service);
         }
 
-        ContextCompat.startForegroundService(getApplicationContext(),service);
+
     }
 
     private void createNotificationChannel() {

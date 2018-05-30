@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Random;
 
 import static a238443.musicplayer.Constants.FUNCTIONAL.FORWARD_COOLDOWN;
-import static a238443.musicplayer.Constants.FUNCTIONAL.MUSIC_REFRESH_DELAY;
 
 public class MusicService extends Service {
     private MediaPlayer player;
@@ -41,6 +40,7 @@ public class MusicService extends Service {
     private boolean shuffle = false;
     public static boolean IS_SERVICE_RUNNING = false;
     public static boolean IS_MUSIC_STARTED = false;
+    public static boolean IS_PLAYING = false;
 
     @Override
     public void onCreate() {
@@ -210,6 +210,7 @@ public class MusicService extends Service {
         catch (Exception e) { Log.e("player_prepare","Preparation failed"); }
 
         player.start();
+        IS_PLAYING = true;
         fullTime = player.getDuration();
         fullTimeBroadcast();
         this.playedPosition = playedPosition;
@@ -230,10 +231,14 @@ public class MusicService extends Service {
     private void changeIcon() {
         int currentIcon = builder.mActions.get(1).icon;
 
-        if(currentIcon == R.drawable.ic_pause_borderless)
+        if(currentIcon == R.drawable.ic_pause_borderless) {
             builder.mActions.get(1).icon = R.drawable.ic_play_borderless;
-        else
+            IS_PLAYING = false;
+        }
+        else {
             builder.mActions.get(1).icon = R.drawable.ic_pause_borderless;
+            IS_PLAYING = true;
+        }
         notificationManager.notify(Constants.NOTIFICATION_ID.FOREGROUND_SERVICE, builder.build());
     }
 
@@ -245,6 +250,7 @@ public class MusicService extends Service {
             } else
                 player.seekTo(fullTime);
         }
+        basicBroadcast();
     }
 
     private void goRewind() {
@@ -254,6 +260,7 @@ public class MusicService extends Service {
         }
         else
             player.seekTo(0);
+        basicBroadcast();
     }
 
     private void startNext() {

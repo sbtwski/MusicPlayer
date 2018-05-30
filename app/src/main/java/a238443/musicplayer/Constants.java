@@ -37,7 +37,7 @@ class Constants {
         int MUSIC_REFRESH_DELAY = 800;
         int REWIND_SET_REFRESH_DELAY = 700;
         int UI_UPDATE_REFRESH_DELAY = 800;
-        int MINOR_ELEMENTS_REFRESH_DELAY = 75;
+        int MINOR_ELEMENTS_REFRESH_DELAY = 50;
         int DURATION_BROADCAST_REFRESH_DELAY = 850;
         int REWIND_AMOUNT = 10000;
         int CHANGE_ATTEMPTS = 2;
